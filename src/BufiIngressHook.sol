@@ -257,6 +257,12 @@ contract BufiIngressHook is BaseHook {
     function _beforeSwap(
         address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData
     ) internal override returns (bytes4, BeforeSwapDelta, uint24) {
+        // Passthrough for swaps that don't carry Bufi intent.  The production hook
+        // is only ever installed on the two stable-pair pool classes it owns; a
+        // swap with empty hookData isn't a Bufi flow and shouldn't be gated here.
+        if (hookData.length == 0) {
+            return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+        }
         HookData memory data = abi.decode(hookData, (HookData));
         _validateBeforeSwap(sender, key, params, data);
 
@@ -283,6 +289,10 @@ contract BufiIngressHook is BaseHook {
     function _afterSwap(
         address, PoolKey calldata key, SwapParams calldata params, BalanceDelta delta, bytes calldata hookData
     ) internal override returns (bytes4, int128) {
+        // Passthrough symmetric with beforeSwap.
+        if (hookData.length == 0) {
+            return (BaseHook.afterSwap.selector, 0);
+        }
         HookData memory data = abi.decode(hookData, (HookData));
         PendingSwap memory ctx = pendingSwaps[data.depositId];
         if (!ctx.inProgress) revert InvalidDeposit();
